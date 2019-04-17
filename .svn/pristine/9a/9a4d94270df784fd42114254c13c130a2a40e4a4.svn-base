@@ -1,0 +1,140 @@
+.label{
+    display:flex;
+    align-items: center;
+    color:white;
+    margin-right: 15px;
+    padding: 10px;
+    border-radius:5px;
+}
+.value{
+    display:flex;
+    align-items:center;
+}
+.app-container {
+	display: flex;
+	height: 50vh;
+	.video-player-container {
+		flex: 1 1 0;
+		margin: 0 15px;
+    }
+    .translation-card {
+        border: 1px solid;
+        margin: 2px;
+        padding: 2px;
+        flex: 1 1 0;  
+        display: flex;
+        flex-direction: column;
+        .timers-container {
+            display: flex;
+            flex: 1 1 0;
+            margin: 2px 15px;
+            .start-time {
+                flex: 1 1 0;
+                display: flex;
+                justify-content: start;
+                &-label {
+                    @extend .label;
+                    background: #28a745;
+                }
+                &-value{
+                    @extend .value;
+                }
+            }
+            .end-time {
+                flex: 1 1 0;
+                display: flex;
+                justify-content: flex-end;
+                &-label {
+                    @extend .label;
+                    background: #dc3545;
+                }
+                &-value{
+                    @extend .value;
+                }
+            }
+        }
+        .input-container {
+            display: flex;
+            flex: 8 1 0;
+            padding: 4px 0;
+            input {
+                width: 100%;
+                margin: 2px 15px;
+            }
+            textarea{
+                width:100%;
+                margin: 0px 15px;
+            }
+        }
+        .buttons-container {
+            display: flex;
+            flex: 1 1 0;
+            justify-content: flex-end;
+            margin: 2px 15px;
+            button {
+                margin: 0 2px;
+            }
+        }
+    }
+}
+.text-editor {
+	float: right;
+	width: 48vw;
+	height: 40vh;
+    margin: 15px;
+    textarea{
+        width:100%;
+        height:100%;
+    }
+    .drop-zone {
+        flex-direction: column;
+        button {
+            width: unset;
+        }
+    }
+    .control-button{
+        margin-right:15px;
+    }
+}
+.translation-cards-contianer {
+	border: 1px solid;
+	height: 45vh;
+	width: 50%;
+	margin: 15px auto;
+	overflow: auto;
+}
+
+.file-hovered {
+	border: 2px solid green !important;
+}
+
+.drop-zone {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed;
+    &-text {
+        display: flex;
+        flex-wrap: wrap;
+    }
+    span,
+    button {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+}
+
+.subtitle-controls{
+    position: absolute;
+    bottom: 20vh;
+    width: 50vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    button{
+        margin:0 15px;
+    }
+}
+

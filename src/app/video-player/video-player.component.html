@@ -1,0 +1,38 @@
+<div class="video-container">
+  <video width="100%" height="100%" #videoPlayer (fullscreenchange)="fullScreenChanged()" (timeupdate)="videoUpdated($event)"
+    (click)="(videoPlayer.paused)?videoPlayer.play():videoPlayer.pause()">
+  </video>
+  <div class="play-pause-layer fa" [class.fa-play-circle]="videoPlayer.paused"></div>
+  <div class="video-controls">
+    <div class="video-time">{{currentPlaybackTime | TimeFormatter}}/{{videoPlayer.duration | TimeFormatter}}</div>
+    <div class="video-control-progress">
+      <div class="playback-slider" #playbackSlider></div>
+    </div>
+    <div class="video-controls-buttons">
+      <div class="marker-buttons">
+        <button class="btn btn-success" (click)="controlStartMarker()">{{(startMarkerAddedFlag)?"Move Start Marker at Current Playback":"Add Start
+          Marker
+          at
+          Current Playback"}}</button>
+        <button class="btn btn-danger" [disabled]="endButtonDisabledFlag" (click)="controlEndMarker()">{{(endMarkerAddedFlag)?"Move End Marker at
+          Current
+          Playback":"Add End Marker at Current Playback"}}</button>
+      </div>
+      <i [ngClass]="{'fa':true,'control-button':true,
+      'fa-volume-up':!videoPlayer.muted,
+      'fa-volume-off':videoPlayer.muted}"
+        (click)="muteVideo()"></i>
+      <div class="volume-slider" #volumeSlider></div>
+    </div>
+  </div>
+</div>
+<div class="timeline-container" #timelineContainer (wheel)=timelineScrolled($event)>
+  <div class="current-time-display-beam"></div>
+  <div class="timeline" [style.width.px]="timelineWidth" [style.transform]="'translate(-'+timelinePosition+'px)'">
+    <div class="timeline-text" *ngFor="let text of timelineCards;let i=index;" [style.width.px]="text.width"
+      [style.left.px]="text.startPosition" (click)="editTranslation(i)">{{text.translationCard.translationText}}</div>
+    <div class="pip" *ngFor="let pip of pips" [style.left.px]="pip.position">
+      <div class="pip-name">{{pip.name}}</div>
+    </div>
+  </div>
+</div>

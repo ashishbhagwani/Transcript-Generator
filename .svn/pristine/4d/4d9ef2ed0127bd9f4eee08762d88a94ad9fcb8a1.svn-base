@@ -1,0 +1,67 @@
+<div class="app-container">
+
+  <div class="video-player-container">
+    <app-video-player *ngIf="fileAlreadyDropped" [videoSourceFile]="videoPlayerInputFile" (startTimeChanged)="editableTranslationCard.startTime=$event"
+      (endTimeChanged)="editableTranslationCard.endTime=$event" (editTranslationEvent)="editTranslation($event)"></app-video-player>
+    <div class="drop-zone" *ngIf="!fileAlreadyDropped" [class.file-hovered]="videoFileHovered" (dragover)="$event.preventDefault();videoFileHovered=true"
+      (dragleave)="videoFileHovered=false" (drop)="useDroppedFileAsVideoSource($event)">
+      <div class="drop-zone-text">
+        <span>Drop Video</span>
+        <span>OR</span>
+        <button (click)="fileInput.click()">Upload Video</button>
+        <input #fileInput type="file" style="display:none" (change)="useUploadedFileAsVideoSource($event)" accept="video/mp4">
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="fileAlreadyDropped" class="translation-card editable-translation-cards" [class.full-height]="inEditMode">
+    <div class="timers-container">
+      <div class="start-time">
+        <div class="start-time-label">
+          Start Time
+        </div>
+        <div class="start-time-value">
+          {{editableTranslationCard.startTime | TimeFormatter:'true'}}
+        </div>
+      </div>
+      <div class="end-time">
+        <div class="end-time-label">
+          End Time
+        </div>
+        <div class="end-time-value">
+          {{editableTranslationCard.endTime | TimeFormatter:'true'}}
+        </div>
+      </div>
+    </div>
+    <div class="input-container">
+      <textarea [(ngModel)]="editableTranslationCard.translationText" #translationTextInput></textarea>
+    </div>
+    <div class="buttons-container">
+      <button class="btn btn-primary" (click)="addTranslation()" [disabled]="(editableTranslationCard.endTime-editableTranslationCard.startTime==0) || editableTranslationCard.translationText == ''">Done</button>
+      <button class="btn btn-primary" *ngIf="editableTranslationCardEditMode" (click)="deleteTranslation()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="fileAlreadyDropped" class="text-editor">
+  <textarea #selectionBox *ngIf="textFileUploaded && !selectionBoxEditMode" class="text-container" (click)="cursorChanged($event)"
+    (focus)="cursorChanged($event)" (keydown)="cursorChanged($event)" (keyup)="cursorChanged($event)">{{selectionBoxContent}}</textarea>
+  <textarea #textarea *ngIf="selectionBoxEditMode" class="text-container" [(ngModel)]="selectionBoxContent"></textarea>
+  <div *ngIf="!textFileUploaded" class="drop-zone" [class.file-hovered]="textFileHovered" (dragover)="$event.preventDefault();textFileHovered=true"
+    (dragleave)="textFileHovered=false" (drop)="$event.preventDefault();uploadTextFile($event,true)">
+    <span>Drop Video</span>
+    <span>OR</span>
+    <button (click)="fileInput.click()">Upload Text File</button>
+    <input #fileInput type="file" style="display:none" (change)="uploadTextFile($event,false)" accept="text/plain">
+  </div>
+  <button class="btn btn-primary control-button" *ngIf="textFileUploaded && !selectionBoxEditMode" (click)="useSelectedText()">Use Selected Text</button>
+  <button class="btn btn-primary control-button" *ngIf="textFileUploaded && !selectionBoxEditMode" (click)="selectionBoxEditMode=true">Edit Current Text</button>
+  <button class="btn btn-primary control-button" *ngIf="selectionBoxEditMode" (click)="selectionBoxEditMode=false">Go Back to Selection Mode</button>
+</div>
+
+<div *ngIf="isTranslationCardCollectionEmpty()" class="subtitle-controls">
+  <button (click)="generteVTT()">Generate WebVTT</button>
+  <button (click)="previewWorkDone()">Preview Your Work</button>
+</div>
+
+<a #vttDownload download="subtitles.vtt" style="display:none"></a>

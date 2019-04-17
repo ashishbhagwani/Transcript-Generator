@@ -1,0 +1,321 @@
+import { Component, OnInit, Input, ViewChild, ElementRef, AfterViewInit, Output, EventEmitter, HostListener } from '@angular/core';
+import * as nouislider from 'nouislider';
+import { DataCommunicationService } from '../data-communication.service';
+import { TranslationCardsService } from '../translation-cards.service';
+import { TranslationCardModel } from '../translation-card.model';
+import { TimeLineCard } from '../timeline-cards.model';
+import { TimeFormatterPipe } from '../time-formatter.pipe';
+
+const KEY_SPACE = 32;
+const KEY_S = 83;
+const KEY_E = 69;
+@Component({
+  selector: 'app-video-player',
+  templateUrl: './video-player.component.html',
+  styleUrls: ['./video-player.component.scss']
+})
+export class VideoPlayerComponent implements OnInit, AfterViewInit {
+  @Input() videoSourceFile: File;
+
+  @ViewChild('timeline') timelineComponent: ElementRef;
+  @ViewChild('videoPlayer') player: ElementRef;
+  @ViewChild('volumeSlider') volumeSlider: ElementRef;
+  @ViewChild('playbackSlider') playbackSlider: ElementRef;
+  @ViewChild('timelineContainer') timeLineContainer: ElementRef;
+
+  @Output() startTimeChanged: EventEmitter<number> = new EventEmitter<number>();
+  @Output() endTimeChanged: EventEmitter<number> = new EventEmitter<number>();
+  @Output() editTranslationEvent: EventEmitter<number> = new EventEmitter<number>();
+
+  playbackSliderOptions: any = {};
+  playbackSlidersOptionsStartArray = [0];
+  playbackSliderOptionsConnectArray = [true, false];
+  nativeVideoPlayer: HTMLVideoElement;
+  currentPlaybackTime = 0;
+  videoVolume: number;
+  startMarkerAddedFlag = false;
+  endMarkerAddedFlag = false;
+  endButtonDisabledFlag = true;
+  pips = [{ name: -1, position: 0 }];
+  timelineWidth = 0;
+  timelineCards: TimeLineCard[] = [];
+  timelinePosition = 0;
+  timelineContainerWidth = 0;
+  subtitleTrackForPreview: TextTrack;
+  playbackTimeBeforePreview: number;
+  videoAlreadyPaused = false;
+  @HostListener('document:keydown', ['$event']) handleKeyBoardEvent(event: KeyboardEvent) {
+    if (event.keyCode === KEY_SPACE) {
+      event.preventDefault();
+      (this.nativeVideoPlayer.paused) ? this.nativeVideoPlayer.play() : this.nativeVideoPlayer.pause();
+    }
+    if (event.keyCode === KEY_S && event.shiftKey) {
+      event.preventDefault();
+      this.controlStartMarker();
+    }
+    if (event.keyCode === KEY_E && event.shiftKey) {
+      event.preventDefault();
+      this.controlEndMarker();
+    }
+  }
+
+  constructor(private dataCommunication: DataCommunicationService,
+    private translationCardService: TranslationCardsService,
+    private timeFormatter: TimeFormatterPipe) { }
+
+  ngOnInit() {
+    this.setupVideoSource();
+    this.setupVolumeSlider();
+    this.setupPlaybackSlider();
+    this.setupTimeLine();
+    this.setupTimelineCards();
+    this.setupEventsForCommunicationWithServices();
+  }
+
+  ngAfterViewInit() {
+    this.setUpEventsOnSlider();
+  }
+
+  muteVideo() {
+    this.nativeVideoPlayer.muted = !this.nativeVideoPlayer.muted;
+    this.volumeSlider.nativeElement.noUiSlider.set(
+      (this.nativeVideoPlayer.muted) ? 0 : this.nativeVideoPlayer.volume
+    );
+  }
+
+  addMarker() {
+    const markerValue = this.getSliderValueFromTime(this.nativeVideoPlayer.currentTime, this.nativeVideoPlayer.duration);
+    this.playbackSlidersOptionsStartArray.push(markerValue);
+    this.playbackSliderOptionsConnectArray.push(false);
+    this.setPlaybackSliderOptions(this.playbackSlidersOptionsStartArray, this.playbackSliderOptionsConnectArray);
+    this.recreatePlaybackSlider(this.playbackSlider.nativeElement, this.playbackSliderOptions);
+  }
+
+  videoUpdated(event) {
+    const currentPlaybackSliderValue = this.getSliderValueFromTime(event.target.currentTime, this.nativeVideoPlayer.duration);
+    this.currentPlaybackTime = event.target.currentTime;
+    this.playbackSlider.nativeElement.noUiSlider.setHandle(0, currentPlaybackSliderValue, false);
+    this.playbackSlidersOptionsStartArray[0] = currentPlaybackSliderValue;
+    this.timelinePosition = (this.timelineContainerWidth / 10) * this.currentPlaybackTime;
+  }
+
+  controlStartMarker() {
+    (this.startMarkerAddedFlag) ? this.moveStartMarkerToCurrentTime() : this.addStartMarker();
+  }
+
+  controlEndMarker() {
+    (this.endMarkerAddedFlag) ? this.moveEndMarkerToCurrentTime() : this.addEndMarker();
+  }
+
+  editTranslation(index: number) {
+    this.timelineCards.splice(index, 1);
+    this.editTranslationEvent.emit(index);
+  }
+
+  timelineScrolled(event) {
+    const currentPlaybackTime = this.nativeVideoPlayer.currentTime;
+    (event.wheelDelta > 0 && currentPlaybackTime > 1) ? this.nativeVideoPlayer.currentTime-- : this.nativeVideoPlayer.currentTime++;
+  }
+
+  fullScreenChanged() {
+    if (!document.fullscreen) {
+      this.subtitleTrackForPreview.mode = 'disabled';
+      this.nativeVideoPlayer.currentTime = this.playbackTimeBeforePreview;
+    }
+  }
+
+  private moveStartMarkerToCurrentTime() {
+    const currentSliderValue = this.getSliderValueFromTime(this.currentPlaybackTime, this.nativeVideoPlayer.duration);
+    this.playbackSlider.nativeElement.noUiSlider.setHandle(1, currentSliderValue, false);
+    this.startTimeChanged.emit(this.currentPlaybackTime);
+  }
+
+  private moveEndMarkerToCurrentTime() {
+    const currentSliderValue = this.getSliderValueFromTime(this.currentPlaybackTime, this.nativeVideoPlayer.duration);
+    this.playbackSlider.nativeElement.noUiSlider.setHandle(2, currentSliderValue, false);
+    this.endTimeChanged.emit(this.currentPlaybackTime);
+  }
+
+  private addStartMarker() {
+    this.startMarkerAddedFlag = true;
+    this.endButtonDisabledFlag = false;
+    this.addMarker();
+    this.startTimeChanged.emit(this.nativeVideoPlayer.currentTime);
+  }
+
+  private addEndMarker() {
+    this.endMarkerAddedFlag = true;
+    this.addMarker();
+    this.endTimeChanged.emit(this.nativeVideoPlayer.currentTime);
+  }
+
+  private setupVideoSource() {
+    this.nativeVideoPlayer = this.player.nativeElement;
+    this.nativeVideoPlayer.src = URL.createObjectURL(this.videoSourceFile);
+  }
+
+  private setupVolumeSlider() {
+    const opt: any = {
+      start: [0],
+      behaviour: 'snap',
+      range: {
+        min: 0,
+        max: 1
+      },
+      step: 0.1,
+      connect: [true, false]
+    };
+    nouislider.create(this.volumeSlider.nativeElement, opt);
+  }
+
+  private setupPlaybackSlider() {
+    this.playbackSliderOptions = {
+      start: this.playbackSlidersOptionsStartArray,
+      behaviour: 'unconstrained',
+      range: {
+        min: 0,
+        max: 100
+      },
+      connect: this.playbackSliderOptionsConnectArray
+    };
+    nouislider.create(this.playbackSlider.nativeElement, this.playbackSliderOptions);
+  }
+
+  private setupTimeLine() {
+    this.timelineContainerWidth = this.timeLineContainer.nativeElement.clientWidth;
+    this.nativeVideoPlayer.onloadedmetadata = () => {
+      this.timelineWidth = (this.nativeVideoPlayer.duration * this.timelineContainerWidth) / 10;
+      this.initializePipsArray(this.nativeVideoPlayer.duration);
+    };
+  }
+
+  private initializePipsArray(videoLength) {
+    for (let i = 0; i < (videoLength + 20); i++) {
+      this.pips.push({ name: this.timeFormatter.transform(i), position: (this.timelineContainerWidth * (i + 1)) / 10 });
+    }
+  }
+
+  private setupTimelineCards() {
+    const translationCards = this.translationCardService.getAllTranslationCards();
+    translationCards.forEach((value, index) => {
+      this.timelineCards.push(this.convertTranslationCardToTimelineCard(value));
+    });
+  }
+
+  private setUpEventsOnSlider() {
+    const self = this;
+    this.playbackSlider.nativeElement.noUiSlider.on('end', (value, handle) => {
+      self.executeSliderHandleMovement(value, handle);
+    });
+    this.playbackSlider.nativeElement.noUiSlider.on('start', (value, handle) => {
+      if (handle === 0) {
+        (this.nativeVideoPlayer.paused) ? this.videoAlreadyPaused = true : this.nativeVideoPlayer.pause();
+      }
+    });
+    this.volumeSlider.nativeElement.noUiSlider.on('slide', (value) => {
+      self.nativeVideoPlayer.volume = value;
+    });
+    this.volumeSlider.nativeElement.noUiSlider.set(this.nativeVideoPlayer.volume);
+  }
+
+  private executeSliderHandleMovement(value, handle) {
+    const currentTime = this.getTimeFromSliderValue(value[handle], this.nativeVideoPlayer.duration);
+    switch (handle) {
+      case 0: {
+        this.nativeVideoPlayer.currentTime = currentTime;
+        if (!this.videoAlreadyPaused) {
+          this.nativeVideoPlayer.play();
+          this.videoAlreadyPaused = false;
+        }
+        break;
+      }
+      case 1: this.startTimeChanged.emit(currentTime); break;
+      case 2: this.endTimeChanged.emit(currentTime); break;
+    }
+  }
+
+  private setupEventsForCommunicationWithServices() {
+    const self = this;
+    this.dataCommunication.requestVideoPreview.subscribe(() => {
+      self.addSubtitlesAndPreviewVideo();
+    });
+    this.dataCommunication.requestEditTranslation.subscribe((value) => {
+      this.setSliderMarkerFlags(true, true, false);
+      const startArray = [self.playbackSlidersOptionsStartArray[0], value.startTime, value.endTime];
+      const connectArray = [true, false, false, false];
+      this.setPlaybackSliderOptions(startArray, connectArray);
+      this.recreatePlaybackSlider(self.playbackSlider.nativeElement, self.playbackSliderOptions);
+    });
+    this.setupTranslationCardsEvents();
+  }
+
+  private addSubtitlesAndPreviewVideo() {
+    this.subtitleTrackForPreview = this.nativeVideoPlayer.addTextTrack('captions');
+    this.subtitleTrackForPreview.mode = 'showing';
+    this.translationCardService.addVTTCuesToTrack(this.subtitleTrackForPreview);
+    this.previewVideo();
+  }
+
+  private previewVideo() {
+    this.nativeVideoPlayer.requestFullscreen();
+    this.playbackTimeBeforePreview = this.nativeVideoPlayer.currentTime;
+    this.nativeVideoPlayer.currentTime = 0;
+  }
+
+  private setupTranslationCardsEvents() {
+    this.translationCardService.translationAdded.subscribe((translationCard) => {
+      this.timelineCards.push(this.convertTranslationCardToTimelineCard(translationCard));
+      this.removeAllMarkersFromSlider();
+    });
+    this.translationCardService.translationEdited.subscribe((value) => {
+      this.timelineCards.push(this.convertTranslationCardToTimelineCard(value.translationCard));
+      this.removeAllMarkersFromSlider();
+    });
+    this.translationCardService.translationDeleted.subscribe((index) => {
+      this.timelineCards.splice(index, 1);
+      this.removeAllMarkersFromSlider();
+    });
+  }
+
+  private removeAllMarkersFromSlider() {
+    this.setSliderMarkerFlags(false, false, true);
+    this.setPlaybackSliderOptions([this.playbackSlidersOptionsStartArray[0]], [true, false]);
+    this.recreatePlaybackSlider(this.playbackSlider.nativeElement, this.playbackSliderOptions);
+  }
+
+  private convertTranslationCardToTimelineCard(translationCard) {
+    const timelineCard: TimeLineCard = {
+      translationCard: translationCard,
+      startPosition: ((translationCard.startTime + 1) * this.timelineContainerWidth) / 10,
+      width: (translationCard.endTime - translationCard.startTime) * this.timelineContainerWidth / 10
+    };
+    return timelineCard;
+  }
+
+  private recreatePlaybackSlider(slider, playbackOptions) {
+    this.playbackSlider.nativeElement.noUiSlider.destroy();
+    nouislider.create(slider, playbackOptions);
+    this.setUpEventsOnSlider();
+  }
+
+  private setSliderMarkerFlags(startMarkerAdded: boolean, endMarkerAdded: boolean, endButtonDisabled: boolean) {
+    this.startMarkerAddedFlag = startMarkerAdded;
+    this.endMarkerAddedFlag = endMarkerAdded;
+    this.endButtonDisabledFlag = endButtonDisabled;
+  }
+
+  private getSliderValueFromTime(time: number, duration: number) {
+    return (100 / duration) * time;
+  }
+
+  private getTimeFromSliderValue(sliderValue: number, duration: number) {
+    return duration * (sliderValue / 100);
+  }
+
+  private setPlaybackSliderOptions(startArray, connectArray) {
+    this.playbackSlidersOptionsStartArray = startArray;
+    this.playbackSliderOptionsConnectArray = connectArray;
+    this.playbackSliderOptions.start = this.playbackSlidersOptionsStartArray;
+    this.playbackSliderOptions.connect = this.playbackSliderOptionsConnectArray;
+  }
+}

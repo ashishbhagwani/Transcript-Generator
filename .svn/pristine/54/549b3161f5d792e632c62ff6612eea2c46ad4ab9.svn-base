@@ -1,0 +1,47 @@
+/* You can add global styles to this file, and also import other style files */
+@import "~nouislider/distribute/nouislider.min.css";
+@import "../node_modules/font-awesome/css/font-awesome.css";
+.noUi-horizontal{
+    height:6px;
+}
+
+.noUi-handle:after{
+    content: "";
+    display: block;
+    position: absolute;
+    width: 0 !important;
+    height: 0 !important;
+    border: solid transparent;
+    border-width: 14px;
+    border-right-color: #28a745;
+    left: -30px !important;
+    top: -1px !important;
+    background: none;
+}
+
+.noUi-handle{
+    width: 2px !important;
+    height: 56px !important;
+    top: -50px !important;
+    right: -1px !important;
+    outline: none;
+}
+
+.noUi-handle-lower:after, .noUi-handle:before{
+    content : unset;
+}
+
+.noUi-handle-lower{
+    width : 15px !important;
+    height : 15px !important;
+    top : -6px !important;
+    border-radius:50% !important;
+}
+
+.noUi-handle-upper:after{
+    border-right-color:#dc3545;
+}
+
+html:not([dir=rtl]) .noUi-horizontal .noUi-handle{
+    right : -10px !important;
+}
